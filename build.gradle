@@ -3,6 +3,8 @@ apply(plugin:"eclipse")
 
 dependencies {
     groovy("org.codehaus.groovy:groovy:1.8.0")
+    
+    testCompile("junit:junit:4.8.2")
 }
 
 repositories {
