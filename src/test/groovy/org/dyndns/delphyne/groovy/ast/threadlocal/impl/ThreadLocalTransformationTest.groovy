@@ -1,27 +1,35 @@
 package org.dyndns.delphyne.groovy.ast.threadlocal.impl
 
+import groovy.util.logging.Slf4j;
+
 import org.junit.Test
 
+@Slf4j
 class ThreadLocalTransformationTest {
     @Test
-    void testTransform() {
+    void testNoInitialValue() {
+        log.warn " no initialValue ".center(80, "*")
         def tester = new GroovyClassLoader().parseClass('''
-            class MyClass {
+            class NoInitialValue {
                 @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal
                 Integer myInt
             }
         ''')
+        def noInitialValue = tester.newInstance()
+        assert noInitialValue.myInt == null
+        noInitialValue.myInt = 1
+        assert noInitialValue.myInt == 1
+        noInitialValue.myInt = Integer.MAX_VALUE
+        assert noInitialValue.myInt == Integer.MAX_VALUE
+    }
+    
+    @Test
+    void testInitialValueProvided() {
         
-        def myClass = tester.newInstance()
-        println myClass.dump()
+    }
+    
+    @Test
+    void testMultiThreaded() {
         
-        tester = new GroovyClassLoader().parseClass('''
-            class MyClass {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal(initialValue={Integer.MAX_VALUE})
-                Integer myInt
-            }
-        ''')
-        myClass = tester.newInstance()
-        println myClass.dump()
     }
 }
