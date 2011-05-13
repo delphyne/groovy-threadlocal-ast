@@ -13,6 +13,7 @@ import org.codehaus.groovy.ast.builder.AstBuilder
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
+import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
@@ -52,7 +53,7 @@ class ThreadLocalTransformation implements ASTTransformation, Opcodes {
         AnnotationNode annotation = nodes[0]
         FieldNode field = nodes[1]
         ClassNode clazz = field.declaringClass
-                
+        
         log.trace "Processing ThreadLocal AST Transformation on $clazz.$field"
         
         String name = field.name
@@ -81,11 +82,20 @@ class ThreadLocalTransformation implements ASTTransformation, Opcodes {
     }
     
     Expression createInitialValue(ClosureExpression providedClosure) {
-        List<ASTNode> nodes = new AstBuilder().buildFromCode {
-            new ThreadLocal()
+        if (providedClosure) {
+            log.trace "Using provided closure as initialization value"
+            ASTNode[] nodes = new AstBuilder().buildFromCode {
+                [initialValue: {Integer.MAX_VALUE}] as ThreadLocal
+            }
+            nodes[0].statements[0].expression.expression.mapEntryExpressions[0].valueExpression = providedClosure
+            nodes[0].statements[0].expression
+        } else {
+            log.trace "Providing default ThreadLocal as initialization value"
+            new ConstructorCallExpression(
+                    ClassHelper.make(ThreadLocal),
+                    ArgumentListExpression.EMPTY_ARGUMENTS
+                )
         }
-        
-        nodes[0].statements[0].expression
     }
     
     MethodNode createGetter(String name, ClassNode type) {

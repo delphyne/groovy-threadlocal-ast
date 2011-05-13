@@ -1,4 +1,4 @@
-package org.dyndns.delphyne.groovy.ast.threadlocal.anno
+package org.dyndns.delphyne.groovy.ast.threadlocal
 
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
