@@ -11,7 +11,7 @@ class ThreadLocalTransformationTest {
         log.warn " no initialValue ".center(80, "*")
         def tester = new GroovyClassLoader().parseClass('''
             class NoInitialValue {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal
                 Integer myInt
             }
         ''').newInstance()
@@ -28,7 +28,7 @@ class ThreadLocalTransformationTest {
         log.warn " initial value provided ".center(80, "*")
         def tester = new GroovyClassLoader().parseClass('''
             class SimpleInitialValueProvided {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal(initialValue={Integer.MAX_VALUE})
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal(initialValue={Integer.MAX_VALUE})
                 Integer myInt
             }
         ''').newInstance()
@@ -40,7 +40,7 @@ class ThreadLocalTransformationTest {
         tester = new GroovyClassLoader().parseClass('''
             class ComplexInitialValueProvided {
                 private final static java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0)
-                @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal(initialValue={counter.andIncrement.intValue()})
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal(initialValue={counter.andIncrement.intValue()})
                 Integer myInt
             }
         ''')
@@ -55,7 +55,7 @@ class ThreadLocalTransformationTest {
     void testMultiThreaded() {
         def tester = new GroovyClassLoader().parseClass('''
             class NoInitialValue {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.anno.ThreadLocal
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal
                 Integer myInt
             }
         ''').newInstance()
@@ -68,7 +68,7 @@ class ThreadLocalTransformationTest {
             threads << Thread.start {
                 def myValue = it
                 tester.myInt = myValue
-                10.times {
+                3.times {
                     Thread.sleep(random.nextInt(1000))
                 }
                 assert tester.myInt == myValue

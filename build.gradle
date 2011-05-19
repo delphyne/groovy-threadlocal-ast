@@ -1,5 +1,9 @@
 apply(plugin:"groovy")
 apply(plugin:"eclipse")
+apply(plugin:"maven")
+
+group="org.dyndns.delphyne"
+version="1.0.0-SNAPSHOT"
 
 dependencies {
     groovy("org.codehaus.groovy:groovy:1.8.0")
@@ -13,4 +17,17 @@ dependencies {
 repositories {
     mavenLocal()
     mavenCentral()
+}
+
+jar {
+    manifest {
+        attributes(
+                "Created-By": "Gradle",
+                "Built-By": System.env["USER"] ?: System.env["USERNAME"],
+                "Implementation-Title": project.name,
+                "Implementation-Version": project.version,
+                "Implementation-Vendor-Id": project.group,
+                "Implementation-Build": ["hg", "id", "-i"].execute().text
+            )
+    }
 }
