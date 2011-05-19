@@ -3,7 +3,7 @@ apply(plugin:"eclipse")
 apply(plugin:"maven")
 
 group="org.dyndns.delphyne"
-version="1.0.0-SNAPSHOT"
+version="1.0.0"
 
 dependencies {
     groovy("org.codehaus.groovy:groovy:1.8.0")
