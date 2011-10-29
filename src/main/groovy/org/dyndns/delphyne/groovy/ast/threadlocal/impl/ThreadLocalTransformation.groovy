@@ -1,136 +1,169 @@
 package org.dyndns.delphyne.groovy.ast.threadlocal.impl
 
-import groovy.util.logging.Slf4j
-
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
+import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.builder.AstBuilder
-import org.codehaus.groovy.ast.expr.ArgumentListExpression
-import org.codehaus.groovy.ast.expr.ClosureExpression
-import org.codehaus.groovy.ast.expr.ConstantExpression
-import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.expr.MethodCallExpression
-import org.codehaus.groovy.ast.expr.VariableExpression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
-import org.codehaus.groovy.transform.ASTTransformation
+import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-import org.objectweb.asm.Opcodes
+
+import groovy.util.logging.Slf4j
 
 @Slf4j
 @GroovyASTTransformation(phase=CompilePhase.SEMANTIC_ANALYSIS)
-class ThreadLocalTransformation implements ASTTransformation, Opcodes {
+class ThreadLocalTransformation extends AbstractASTTransformation {
 
     private final static THREADLOCAL_CLASSNODE = ClassHelper.make(ThreadLocal)
-    
+    private final static AstBuilder builder = new AstBuilder()
+
     void visit(ASTNode[] nodes, SourceUnit source) {
-        if (!nodes[0] instanceof AnnotationNode) {
-            def msg = "Expected AnnotationNode but got ${nodes[0].class.simpleName}" 
-            source.addError(new SyntaxException(
-                    msg, 
-                    nodes[0]?.lineNumber, 
-                    nodes[0]?.columnNumber))
+        if (!nodes) {
+            return
+        }
+
+        if (!(nodes[0] instanceof AnnotationNode)) {
+            def msg = "Expected AnnotationNode but got ${nodes[0].class.simpleName}"
+            source.addError(
+                    new SyntaxException(
+                            msg,
+                            nodes[0]?.lineNumber,
+                            nodes[0]?.columnNumber))
             log.trace msg
         }
-        
-        if (!nodes[1] instanceof FieldNode) {
-            def msg = "Expected FieldNode but got ${nodes[1].class.simpleName}" 
+
+        if (!(nodes[1] instanceof FieldNode)) {
+            def msg = "Expected FieldNode but got ${nodes[1].class.simpleName}"
             source.addError(new SyntaxException(
-                    msg, 
-                    nodes[1]?.lineNumber, 
+                    msg,
+                    nodes[1]?.lineNumber,
                     nodes[1]?.columnNumber))
             log.trace msg
         }
 
-        AnnotationNode annotation = nodes[0]
-        FieldNode field = nodes[1]
-        ClassNode clazz = field.declaringClass
-        
-        log.trace "Processing ThreadLocal AST Transformation on $clazz.$field"
-        
-        String name = field.name
-        ClassNode targetType = field.originType
-        
-        Expression initialValue = createInitialValue(annotation.getMember("initialValue"))
-        FieldNode newField = createField(name, clazz, initialValue)
-        MethodNode getter = createGetter(name, targetType)
-        MethodNode setter = createSetter(name, targetType)
-        
-        log.trace "Removing field:'$name' from class:'${clazz}'"
-        clazz.removeField(name)
-        
-        log.trace "Adding new ThreadLocal to replace '$name'"
-        clazz.addField(newField)
-        
-        log.trace "Adding proxy getter"
-        clazz.addMethod(getter)
-        
-        log.trace "Adding proxy setter"
-        clazz.addMethod(setter)
-    }
-    
-    FieldNode createField(String name, ClassNode containingClass, Expression initialValue) {
-        new FieldNode(name, ACC_PRIVATE|ACC_FINAL|ACC_STATIC, THREADLOCAL_CLASSNODE, containingClass, initialValue)
-    }
-    
-    Expression createInitialValue(ClosureExpression providedClosure) {
-        if (providedClosure) {
-            log.trace "Using provided closure as initialization value"
-            ASTNode[] nodes = new AstBuilder().buildFromCode {
-                [initialValue: {Integer.MAX_VALUE}] as ThreadLocal
-            }
-            nodes[0].statements[0].expression.expression.mapEntryExpressions[0].valueExpression = providedClosure
-            nodes[0].statements[0].expression
-        } else {
-            log.trace "Providing default ThreadLocal as initialization value"
-            new ConstructorCallExpression(
-                    ClassHelper.make(ThreadLocal),
-                    ArgumentListExpression.EMPTY_ARGUMENTS
-                )
+        FieldNode originalField = (FieldNode)nodes[1]
+
+        if (originalField.type.typeClass.isPrimitive()) {
+            source.addError(
+                    new SyntaxException(
+                            '@ThreadLocal annotated properties cannot be primitives.',
+                            originalField.lineNumber,
+                            originalField.columnNumber))
         }
+
+        ClassNode declaringClass = (ClassNode)originalField.declaringClass
+
+        log.trace "Processing ThreadLocal AST Transformation on ${declaringClass}.${originalField.name}"
+
+        log.trace "Removing ${originalField.type.typeClass.simpleName} ${originalField.name} from ${declaringClass}"
+        declaringClass.removeField(originalField.name)
+
+        log.trace "Adding ThreadLocal field ${originalField.name}"
+        declaringClass.addField(createThreadLocalFieldNode(originalField, declaringClass))
+
+        log.trace "Adding getter for ${originalField.name}"
+        declaringClass.addMethod(createGetter(originalField))
+
+        log.trace "Adding setter for ${originalField.name}"
+        declaringClass.addMethod(createSetter(originalField))
+
+        log.trace "Adding remove method for ${originalField.name}"
+        declaringClass.addMethod(createRemove(originalField))
     }
-    
-    MethodNode createGetter(String name, ClassNode type) {
-        new MethodNode(
-                "get${name.capitalize()}",
-                ACC_PUBLIC|ACC_FINAL|ACC_STATIC,
-                type,
-                [] as Parameter[],
-                [] as ClassNode[],
-                new ExpressionStatement(
-                        new MethodCallExpression(
-                                new VariableExpression(name),
-                                new ConstantExpression("get"),
-                                ArgumentListExpression.EMPTY_ARGUMENTS
-                            )
-                    )
-            )
+
+    FieldNode createThreadLocalFieldNode(FieldNode originalField, ClassNode declaringClass) {
+        Expression initialExpression
+        if (originalField.initialExpression) {
+            // new anonymous inner class with initialValue
+        } else {
+            initialExpression = builder.buildFromSpec {
+                expression {
+                    constructorCall(ThreadLocal) { argumentList() }
+                }
+            }[0].expression
+        }
+
+
+        ClassNode threadLocalWithGenerics = ClassHelper.make(ThreadLocal).plainNodeReference
+        threadLocalWithGenerics.genericsTypes = [
+            new GenericsType(originalField.type)
+        ] as GenericsType[]
+
+
+        new FieldNode(
+        "_tl_${originalField.name}",
+        ACC_PRIVATE | ACC_STATIC | ACC_SYNTHETIC | ACC_FINAL,
+        threadLocalWithGenerics,
+        declaringClass,
+        initialExpression
+        )
     }
-    
-    MethodNode createSetter(String name, ClassNode type) {
+
+    MethodNode createGetter(FieldNode originalField) {
+        Statement getterStatement = builder.buildFromSpec {
+            expression {
+                methodCall {
+                    variable "_tl_${originalField.name}"
+                    constant 'get'
+                    argumentList()
+                }
+            }
+        }[0]
+
         new MethodNode(
-                "set${name.capitalize()}",
-                ACC_PUBLIC|ACC_FINAL|ACC_STATIC,
+        "get${originalField.name.capitalize()}",
+        ACC_PUBLIC | ACC_SYNTHETIC,
+        originalField.type,
+        Parameter.EMPTY_ARRAY,
+        ClassHelper.EMPTY_TYPE_ARRAY,
+        getterStatement
+        )
+    }
+
+    MethodNode createSetter(FieldNode originalField) {
+        Statement setterStatement = builder.buildFromSpec {
+            expression {
+                methodCall {
+                    variable "_tl_${originalField.name}"
+                    constant 'set'
+                    argumentList { variable originalField.name }
+                }
+            }
+        }[0]
+
+        new MethodNode(
+                "set${originalField.name.capitalize()}",
+                ACC_PUBLIC | ACC_SYNTHETIC | ACC_FINAL,
                 ClassHelper.VOID_TYPE,
-                [new Parameter(type, "newName")] as Parameter[],
-                [] as ClassNode[],
-                new ExpressionStatement(
-                        new MethodCallExpression(
-                                new VariableExpression(name),
-                                new ConstantExpression("set"),
-                                new ArgumentListExpression(
-                                        new VariableExpression("newName")
-                                    )
-                            )
-                    )
-            )
+                [new Parameter(originalField.type, originalField.name)] as Parameter[],
+                ClassHelper.EMPTY_TYPE_ARRAY,
+                setterStatement)
+    }
+    
+    MethodNode createRemove(FieldNode originalField) {
+        new MethodNode(
+                "remove${originalField.name.capitalize()}",
+                ACC_PUBLIC | ACC_SYNTHETIC | ACC_FINAL,
+                ClassHelper.VOID_TYPE,
+                Parameter.EMPTY_ARRAY,
+                ClassHelper.EMPTY_TYPE_ARRAY,
+                builder.buildFromSpec {
+                    expression {
+                        methodCall {
+                            variable "_tl_${originalField.name}"
+                            constant 'remove'
+                            argumentList()
+                        }
+                    }
+                }[0])
     }
 }

@@ -3,15 +3,15 @@ apply(plugin:"eclipse")
 apply(plugin:"maven")
 
 group="org.dyndns.delphyne"
-version="1.0.0"
+version="1.0.1-SNAPSHOT"
 
 dependencies {
-    groovy("org.codehaus.groovy:groovy:1.8.0")
+    groovy("org.codehaus.groovy:groovy:1.8.3")
     
-    compile("org.slf4j:slf4j-api:1.6.1")
+    compile("org.slf4j:slf4j-api:1.6.3")
     
-    testCompile("junit:junit:4.8.2")
-    testCompile("org.slf4j:slf4j-log4j12:1.6.1")
+    testCompile("junit:junit:4.10")
+    testCompile("org.slf4j:slf4j-log4j12:1.6.3")
 }
 
 repositories {
@@ -27,7 +27,7 @@ jar {
                 "Implementation-Title": project.name,
                 "Implementation-Version": project.version,
                 "Implementation-Vendor-Id": project.group,
-                "Implementation-Build": ["hg", "id", "-i"].execute().text
+                "Implementation-Build": ['git', 'rev-parse', '--short', 'HEAD'].execute().text
             )
     }
 }

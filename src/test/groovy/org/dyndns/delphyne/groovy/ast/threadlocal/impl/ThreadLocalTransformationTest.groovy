@@ -1,82 +1,104 @@
 package org.dyndns.delphyne.groovy.ast.threadlocal.impl
 
-import groovy.util.logging.Slf4j;
+import java.lang.reflect.Field
 
+import org.codehaus.groovy.control.CompilePhase
+import org.codehaus.groovy.tools.ast.TransformTestHelper
 import org.junit.Test
+
+import groovy.util.logging.Slf4j
 
 @Slf4j
 class ThreadLocalTransformationTest {
+    TransformTestHelper invoker = new TransformTestHelper(new ThreadLocalTransformation(), CompilePhase.CANONICALIZATION)
+
     @Test
-    void testNoInitialValue() {
-        log.warn " no initialValue ".center(80, "*")
-        def tester = new GroovyClassLoader().parseClass('''
-            class NoInitialValue {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal
-                Integer myInt
+    void testVanillaImplementationString() {
+        def clazz = invoker.parse '''\
+            class Vanilla {
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal String s
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal Integer i
             }
-        ''').newInstance()
+        '''.stripIndent()
+
+        assert ThreadLocal == clazz.getDeclaredField('_tl_s').type
+        assert String == clazz.getDeclaredMethod('getS').returnType
+        assert void.class == clazz.getDeclaredMethod('setS', String).returnType
+        assert void.class == clazz.getDeclaredMethod('removeS').returnType
+
+        assert ThreadLocal == clazz.getDeclaredField('_tl_i').type
+        assert Integer == clazz.getDeclaredMethod('getI').returnType
+        assert void.class == clazz.getDeclaredMethod('setI', Integer).returnType
+        assert void.class == clazz.getDeclaredMethod('removeI').returnType
+
+        def instance = clazz.newInstance()
         
-        assert tester.myInt == null
-        tester.myInt = 1
-        assert tester.myInt == 1
-        tester.myInt = Integer.MAX_VALUE
-        assert tester.myInt == Integer.MAX_VALUE
+        assert null == instance.s
+        instance.s = 'hello'
+        assert 'hello' == instance.s
+        instance.s = 1
+        assert String == instance.s.class
+        assert "1" == instance.s
+        instance.removeS()
+        assert null == instance.s
+        
+        assert null == instance.i
+        instance.i = 5
+        assert 5 == instance.i
+        instance.removeI()
+        assert null == instance.i
     }
     
     @Test
-    void testInitialValueProvided() {
-        log.warn " initial value provided ".center(80, "*")
-        def tester = new GroovyClassLoader().parseClass('''
-            class SimpleInitialValueProvided {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal(initialValue={Integer.MAX_VALUE})
-                Integer myInt
+    void testThreadIndependance() {
+        def clazz = invoker.parse '''\
+            class ThreadTester {
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal Double d
             }
-        ''').newInstance()
+        '''.stripIndent()
         
-        assert tester.myInt == Integer.MAX_VALUE
-        tester.myInt = 5
-        assert tester.myInt == 5
-        
-        tester = new GroovyClassLoader().parseClass('''
-            class ComplexInitialValueProvided {
-                private final static java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0)
-                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal(initialValue={counter.andIncrement.intValue()})
-                Integer myInt
-            }
-        ''')
-        tester.myInt = 0
-        tester.myInt = 0
-        
-        Thread.start { tester.myInt == 1 }.join()
-        Thread.start { tester.myInt == 2 }.join()
-    }
-    
-    @Test
-    void testMultiThreaded() {
-        def tester = new GroovyClassLoader().parseClass('''
-            class NoInitialValue {
-                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal
-                Integer myInt
-            }
-        ''').newInstance()
+        def instance = clazz.newInstance()
         
         def threads = []
-        
-        Random random = new Random()
-        
         10.times {
             threads << Thread.start {
-                def myValue = it
-                tester.myInt = myValue
-                3.times {
-                    Thread.sleep(random.nextInt(1000))
-                }
-                assert tester.myInt == myValue
+                Double val = Math.random()
+                instance.d = val
+                Thread.sleep((long)(val * 2000))
+                assert val == instance.d
             }
         }
         
-        threads.each {
-            it.join()
+        threads.each { it.join() }
+    }
+
+    @Test
+    void testPrimitiveProtection() {
+        try {
+            invoker.parse '''\
+                class Primitive {
+                    @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal int i
+                }
+            '''.stripIndent()
+        } catch (ex) {
+            assert ex.message.contains('@ThreadLocal annotated properties cannot be primitives. @ line 2, column 5.')
         }
+    }
+    
+    @Test
+    void testInitialValue() {
+        def clazz = invoker.parse '''\
+            class Initial {
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal String s = "Initial Value"
+            }
+        '''.stripIndent()
+        
+        def instance = clazz.newInstance()
+        
+        assert "Initial Value" == instance.s        
+        instance.s = "New Value"
+        assert "New Value" == instance.s
+        instance.removeS()
+        assert "Initial Value" == instance.s
     }
 }

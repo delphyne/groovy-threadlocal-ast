@@ -26,22 +26,6 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
  *     public static final setMyInt(Integer newValue) { myInt.set(newValue) &#125;
  *&#125;}</blockquote></pre>
  *  
- * An optional initial value closure of arbitrary complexity may be included, for example:
- *
- * <pre><blockquote>{@code class Bar {
- *     private final static counter = new AtomicInteger(0)
- *     @ThreadLocal(initialValue={counter.getAndIncrement().intValue()&#125;) Integer uniqueId
- *&#125;}</blockquote></pre>
- *  
- * <p>will be transformed into:</p>
- *  
- * <pre><blockquote>{@code class Bar {
- *     private final static counter = new AtomicInteger(0)
- *     private final static ThreadLocal uniqueId = [initalValue:{counter.getAndIncrement().intValue()&#125;] as ThreadLocal
- *     public static final getMyInt() { myInt.get() &#125;
- *     public static final setMyInt(Integer newValue) { myInt.set(newValue) &#125;
- *&#125;}</blockquote></pre>
- *  
  * @author Brian M. Carr
  * @since 1.0.0
  */
@@ -49,11 +33,4 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
 @Target([ElementType.FIELD])
 @Documented
 @GroovyASTTransformationClass("org.dyndns.delphyne.groovy.ast.threadlocal.impl.ThreadLocalTransformation")
-@interface ThreadLocal {
-    /**
-     * A map which defines a ThreadLocal.  Available keys are initialize, get, and set.  Default behavior is to 
-     *  create a thread local whose initial value is null, and the get and set methods are directly delegated.
-     * @return
-     */
-    Class initialValue() default Closure
-}
+@interface ThreadLocal { }
