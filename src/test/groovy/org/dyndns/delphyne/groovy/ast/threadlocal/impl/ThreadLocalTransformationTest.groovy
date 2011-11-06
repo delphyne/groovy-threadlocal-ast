@@ -89,7 +89,11 @@ class ThreadLocalTransformationTest {
     void testInitialValue() {
         def clazz = invoker.parse '''\
             class Initial {
+                private static atomic = new java.util.concurrent.atomic.AtomicInteger()
                 @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal String s = "Initial Value"
+                @org.dyndns.delphyne.groovy.ast.threadlocal.ThreadLocal Integer complicatedSetup = {
+                    atomic.getAndIncrement()
+                }.call()
             }
         '''.stripIndent()
         
@@ -100,5 +104,12 @@ class ThreadLocalTransformationTest {
         assert "New Value" == instance.s
         instance.removeS()
         assert "Initial Value" == instance.s
+        
+        assert 0 == instance.complicatedSetup
+        assert 0 == instance.complicatedSetup
+        instance.removeComplicatedSetup()
+        assert 1 == instance.complicatedSetup
+        
+        Thread.start { 2 == instance.complicatedSetup }
     }
 }

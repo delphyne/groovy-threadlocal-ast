@@ -8,8 +8,15 @@ import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.builder.AstBuilder
+import org.codehaus.groovy.ast.expr.ArgumentListExpression
+import org.codehaus.groovy.ast.expr.ClosureExpression
+import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -17,10 +24,16 @@ import org.codehaus.groovy.syntax.SyntaxException
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
+import com.sun.xml.internal.ws.wsdl.parser.FoolProofParserExtension;
+
 import groovy.util.logging.Slf4j
 
-@Slf4j
-@GroovyASTTransformation(phase=CompilePhase.SEMANTIC_ANALYSIS)
+/**
+ * Provides the transformation for the {@link ThreadLocal} annotation.
+
+ * @author Brian M. Carr <delphyne@gmail.com>
+ */
+@GroovyASTTransformation(phase=CompilePhase.INSTRUCTION_SELECTION)
 class ThreadLocalTransformation extends AbstractASTTransformation {
 
     private final static THREADLOCAL_CLASSNODE = ClassHelper.make(ThreadLocal)
@@ -32,22 +45,18 @@ class ThreadLocalTransformation extends AbstractASTTransformation {
         }
 
         if (!(nodes[0] instanceof AnnotationNode)) {
-            def msg = "Expected AnnotationNode but got ${nodes[0].class.simpleName}"
             source.addError(
                     new SyntaxException(
-                            msg,
+                            "Expected AnnotationNode but got ${nodes[0].class.simpleName}",
                             nodes[0]?.lineNumber,
                             nodes[0]?.columnNumber))
-            log.trace msg
         }
 
         if (!(nodes[1] instanceof FieldNode)) {
-            def msg = "Expected FieldNode but got ${nodes[1].class.simpleName}"
             source.addError(new SyntaxException(
-                    msg,
+                    "Expected FieldNode but got ${nodes[1].class.simpleName}",
                     nodes[1]?.lineNumber,
                     nodes[1]?.columnNumber))
-            log.trace msg
         }
 
         FieldNode originalField = (FieldNode)nodes[1]
@@ -83,7 +92,21 @@ class ThreadLocalTransformation extends AbstractASTTransformation {
     FieldNode createThreadLocalFieldNode(FieldNode originalField, ClassNode declaringClass) {
         Expression initialExpression
         if (originalField.initialExpression) {
-            // new anonymous inner class with initialValue
+            def closure = new ClosureExpression(
+                    Parameter.EMPTY_ARRAY,
+                    new BlockStatement(
+                        [new ReturnStatement(
+                                originalField.initialExpression
+                            )], new VariableScope()
+                        )
+                )
+            
+            closure.variableScope = new VariableScope()
+
+            initialExpression = new ConstructorCallExpression(
+                    ClassHelper.make(InitialClosureThreadLocal),
+                    new ArgumentListExpression(closure)
+                )    
         } else {
             initialExpression = builder.buildFromSpec {
                 expression {
@@ -92,20 +115,18 @@ class ThreadLocalTransformation extends AbstractASTTransformation {
             }[0].expression
         }
 
-
         ClassNode threadLocalWithGenerics = ClassHelper.make(ThreadLocal).plainNodeReference
         threadLocalWithGenerics.genericsTypes = [
             new GenericsType(originalField.type)
         ] as GenericsType[]
 
-
         new FieldNode(
-        "_tl_${originalField.name}",
-        ACC_PRIVATE | ACC_STATIC | ACC_SYNTHETIC | ACC_FINAL,
-        threadLocalWithGenerics,
-        declaringClass,
-        initialExpression
-        )
+                "_tl_${originalField.name}",
+                ACC_PRIVATE | ACC_STATIC | ACC_SYNTHETIC | ACC_FINAL,
+                threadLocalWithGenerics,
+                declaringClass,
+                initialExpression
+            )
     }
 
     MethodNode createGetter(FieldNode originalField) {
