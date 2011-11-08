@@ -11,7 +11,6 @@ dependencies {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
@@ -28,10 +27,29 @@ jar {
     }
 }
 
+task sourcesJar(type: Jar, dependsOn:classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+ 
+task javadocJar(type: Jar, dependsOn:javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+ 
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+
 uploadArchives {
     repositories {
         mavenDeployer {
+/*            configuration = configurations.archives*/
+            
             repository(url: new File('.', "repository").canonicalFile.toURL())
         }
     }
 }
+
