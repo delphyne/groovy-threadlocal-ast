@@ -27,3 +27,11 @@ jar {
             )
     }
 }
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: new File('.', "repository").canonicalFile.toURL())
+        }
+    }
+}
