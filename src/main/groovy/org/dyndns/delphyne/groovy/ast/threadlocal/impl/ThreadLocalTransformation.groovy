@@ -12,7 +12,6 @@ import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.builder.AstBuilder
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
@@ -24,10 +23,6 @@ import org.codehaus.groovy.syntax.SyntaxException
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
-import com.sun.xml.internal.ws.wsdl.parser.FoolProofParserExtension;
-
-import groovy.util.logging.Slf4j
-
 /**
  * Provides the transformation for the {@link ThreadLocal} annotation.
 
@@ -36,8 +31,7 @@ import groovy.util.logging.Slf4j
 @GroovyASTTransformation(phase=CompilePhase.INSTRUCTION_SELECTION)
 class ThreadLocalTransformation extends AbstractASTTransformation {
 
-    private final static THREADLOCAL_CLASSNODE = ClassHelper.make(ThreadLocal)
-    private final static AstBuilder builder = new AstBuilder()
+    private AstBuilder builder = new AstBuilder()
 
     void visit(ASTNode[] nodes, SourceUnit source) {
         if (!nodes) {
@@ -71,21 +65,10 @@ class ThreadLocalTransformation extends AbstractASTTransformation {
 
         ClassNode declaringClass = (ClassNode)originalField.declaringClass
 
-        log.trace "Processing ThreadLocal AST Transformation on ${declaringClass}.${originalField.name}"
-
-        log.trace "Removing ${originalField.type.typeClass.simpleName} ${originalField.name} from ${declaringClass}"
         declaringClass.removeField(originalField.name)
-
-        log.trace "Adding ThreadLocal field ${originalField.name}"
         declaringClass.addField(createThreadLocalFieldNode(originalField, declaringClass))
-
-        log.trace "Adding getter for ${originalField.name}"
         declaringClass.addMethod(createGetter(originalField))
-
-        log.trace "Adding setter for ${originalField.name}"
         declaringClass.addMethod(createSetter(originalField))
-
-        log.trace "Adding remove method for ${originalField.name}"
         declaringClass.addMethod(createRemove(originalField))
     }
 

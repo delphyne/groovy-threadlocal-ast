@@ -6,9 +6,6 @@ import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.tools.ast.TransformTestHelper
 import org.junit.Test
 
-import groovy.util.logging.Slf4j
-
-@Slf4j
 class ThreadLocalTransformationTest {
     TransformTestHelper invoker = new TransformTestHelper(new ThreadLocalTransformation(), CompilePhase.CANONICALIZATION)
 

@@ -1,7 +1,5 @@
 package org.dyndns.delphyne.groovy.ast.threadlocal.impl
 
-import groovy.util.logging.Slf4j
-
 /**
  * A subclass of ThreadLocal which derives its initial value from a closure which is passed in to the constructor.
  * 
