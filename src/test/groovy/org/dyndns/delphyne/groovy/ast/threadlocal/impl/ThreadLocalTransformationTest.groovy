@@ -107,6 +107,6 @@ class ThreadLocalTransformationTest {
         instance.removeComplicatedSetup()
         assert 1 == instance.complicatedSetup
         
-        Thread.start { 2 == instance.complicatedSetup }
+        Thread.start { assert 2 == instance.complicatedSetup }
     }
 }
