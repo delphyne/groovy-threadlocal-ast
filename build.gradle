@@ -3,10 +3,10 @@ apply(plugin:'eclipse')
 apply(plugin:'maven')
 
 group='org.dyndns.delphyne'
-version='1.0.1'
+version='1.0.2-SNAPSHOT'
 
 dependencies {
-    groovy('org.codehaus.groovy:groovy:1.8.3')
+    groovy('org.codehaus.groovy:groovy:1.8.4')
     testCompile('junit:junit:4.10')
 }
 
@@ -42,12 +42,9 @@ artifacts {
     archives javadocJar
 }
 
-
 uploadArchives {
     repositories {
         mavenDeployer {
-/*            configuration = configurations.archives*/
-            
             repository(url: new File('.', "repository").canonicalFile.toURL())
         }
     }
